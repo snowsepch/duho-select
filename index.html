@@ -220,6 +220,21 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
 
 #file-input { display: none; }
 
+/* Upload row：拍照 / 相簿 */
+.upload-row {
+  display: flex; gap: 8px; margin-bottom: 14px;
+}
+.upload-btn {
+  flex: 1; padding: 13px 8px;
+  background: var(--card); border: 2px solid var(--border);
+  border-radius: 14px; color: var(--cream);
+  font-family: 'Noto Sans TC', sans-serif; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.upload-btn:active { background: var(--mint-lt); border-color: var(--mint); }
+.upload-btn svg.icon { width: 18px; height: 18px; color: var(--gold); }
+
 /* Analyze btn */
 .analyze-btn {
   width: 100%; padding: 18px;
@@ -690,6 +705,7 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
         <div class="cat-pill" data-cat="IP周邊" onclick="selectManualCat(this)">IP周邊</div>
         <div class="cat-pill" data-cat="生活雜貨" onclick="selectManualCat(this)">生活雜貨</div>
         <div class="cat-pill" data-cat="文具" onclick="selectManualCat(this)">文具</div>
+        <div class="cat-pill" data-cat="書籍" onclick="selectManualCat(this)">書籍</div>
         <div class="cat-pill" data-cat="食品" onclick="selectManualCat(this)">食品</div>
         <div class="cat-pill" data-cat="其他" onclick="selectManualCat(this)">其他</div>
       </div>
@@ -736,22 +752,32 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
     <div class="rate-strip">
       <div class="rate-chip" id="rate-chip-jp">
         <div class="rate-info">
-          <div class="rate-label">JPY → TWD</div>
+          <div class="rate-label" style="display:flex;align-items:center;gap:6px;">
+            JPY → TWD
+            <span id="rate-jp-updated" style="font-size:10px;color:var(--mint);font-family:'Noto Sans TC',sans-serif;font-weight:700;"></span>
+          </div>
           <input type="number" id="rate-jpy" class="rate-val" value="0.215" step="0.001" min="0.01" onchange="saveRates()">
         </div>
-        <div class="rate-unit">× 台幣</div>
+        <button onclick="fetchRates()" id="rate-refresh-btn" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--mint);flex-shrink:0;" title="更新匯率">
+          <svg class="icon" id="rate-refresh-icon" viewBox="0 0 24 24" style="width:20px;height:20px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
       </div>
       <div class="rate-chip" id="rate-chip-kr" style="display:none;">
         <div class="rate-info">
-          <div class="rate-label">KRW → TWD</div>
+          <div class="rate-label" style="display:flex;align-items:center;gap:6px;">
+            KRW → TWD
+            <span id="rate-kr-updated" style="font-size:10px;color:var(--mint);font-family:'Noto Sans TC',sans-serif;font-weight:700;"></span>
+          </div>
           <input type="number" id="rate-krw" class="rate-val" value="0.023" step="0.001" min="0.001" onchange="saveRates()">
         </div>
-        <div class="rate-unit">× 台幣</div>
+        <button onclick="fetchRates()" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--mint);flex-shrink:0;" title="更新匯率">
+          <svg class="icon" viewBox="0 0 24 24" style="width:20px;height:20px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
       </div>
     </div>
 
     <!-- Camera zone -->
-    <div class="cam-zone" id="cam-zone" onclick="onCamZoneClick(event)">
+    <div class="cam-zone" id="cam-zone">
       <img id="preview-img" src="" alt="">
       <button class="reselect-btn" onclick="resetImage(event)" title="重選">✕</button>
       <div class="cam-placeholder" id="cam-placeholder">
@@ -762,7 +788,21 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
         <span>支援日韓文字辨識</span>
       </div>
     </div>
-    <input type="file" id="file-input" accept="image/*" capture="environment" onchange="onImagePick(event)">
+
+    <!-- 拍照 / 相簿 兩個入口 -->
+    <div class="upload-row" id="upload-row">
+      <button class="upload-btn" onclick="document.getElementById('file-camera').click()">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        直接拍照
+      </button>
+      <button class="upload-btn" onclick="document.getElementById('file-album').click()">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        從相簿選取
+      </button>
+    </div>
+    <input type="file" id="file-camera" accept="image/*" capture="environment" onchange="onImagePick(event)" style="display:none;">
+    <input type="file" id="file-album"  accept="image/*" onchange="onImagePick(event)" style="display:none;">
+    <input type="file" id="file-input"  accept="image/*" onchange="onImagePick(event)" style="display:none;">
 
     <button class="analyze-btn" id="analyze-btn" onclick="analyze()" disabled>
       <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -964,8 +1004,17 @@ let manualCat = '童裝';
     document.getElementById('s-rate-jpy').value = jpy;
     document.getElementById('s-rate-krw').value = krw;
     document.getElementById('markup').value = mu;
+
+    // 顯示上次更新時間
+    const lastFetch = localStorage.getItem('tl_rate_fetched');
+    if (lastFetch) {
+      document.getElementById('rate-jp-updated').textContent = 'LIVE';
+      document.getElementById('rate-kr-updated').textContent = 'LIVE';
+    }
   } catch(e) {}
   renderLedger();
+  // 啟動時自動抓取即時匯率
+  fetchRates(true);
 })();
 
 function switchScreen(id, btn) {
@@ -992,6 +1041,91 @@ function selectCountry(c) {
   document.getElementById('btn-kr').classList.toggle('selected', c === 'KR');
   document.getElementById('rate-chip-jp').style.display = c === 'JP' ? '' : 'none';
   document.getElementById('rate-chip-kr').style.display = c === 'KR' ? '' : 'none';
+}
+
+// ─── AUTO FETCH RATES ───
+async function fetchRates(silent = false) {
+  const icon = document.getElementById('rate-refresh-icon');
+  if (icon) icon.style.animation = 'spin .8s linear infinite';
+
+  // 依序嘗試三個支援 CORS 的免費 API
+  const APIs = [
+    {
+      // Frankfurter：歐洲央行資料，穩定支援 CORS
+      url: 'https://api.frankfurter.app/latest?from=JPY&to=TWD',
+      parse: (d) => ({ jpy: d.rates['TWD'], krw: null })
+    },
+    {
+      // open.er-api.com：免費、無需 Key、明確支援 CORS
+      url: 'https://open.er-api.com/v6/latest/TWD',
+      parse: (d) => ({
+        jpy: d.rates ? (1 / d.rates['JPY']) : null,
+        krw: d.rates ? (1 / d.rates['KRW']) : null
+      })
+    },
+    {
+      // fawazahmed0 CDN：完全免費無限制
+      url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/twd.json',
+      parse: (d) => ({
+        jpy: d.twd ? (1 / d.twd['jpy']) : null,
+        krw: d.twd ? (1 / d.twd['krw']) : null
+      })
+    }
+  ];
+
+  let jpyRate = null, krwRate = null;
+
+  for (const api of APIs) {
+    try {
+      const res = await fetch(api.url, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const parsed = api.parse(data);
+      if (parsed.jpy && parsed.jpy > 0) jpyRate = parsed.jpy;
+      if (parsed.krw && parsed.krw > 0) krwRate = parsed.krw;
+      if (jpyRate) break; // 拿到 JPY 就夠用了
+    } catch(e) { continue; }
+  }
+
+  // JPY 拿到了但 KRW 還沒有，再補抓一次
+  if (jpyRate && !krwRate) {
+    try {
+      const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/krw.json', { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.krw && data.krw['twd']) krwRate = data.krw['twd'];
+      }
+    } catch(e) {}
+  }
+
+  if (!jpyRate) {
+    if (!silent) showToast('❌ 匯率抓取失敗，請手動輸入');
+    if (icon) icon.style.animation = '';
+    return;
+  }
+
+  const jpyFinal = jpyRate.toFixed(4);
+  const krwFinal = krwRate ? krwRate.toFixed(5) : null;
+
+  document.getElementById('rate-jpy').value = jpyFinal;
+  document.getElementById('s-rate-jpy').value = jpyFinal;
+  localStorage.setItem('tl_jpy', jpyFinal);
+
+  if (krwFinal) {
+    document.getElementById('rate-krw').value = krwFinal;
+    document.getElementById('s-rate-krw').value = krwFinal;
+    localStorage.setItem('tl_krw', krwFinal);
+  }
+
+  localStorage.setItem('tl_rate_fetched', new Date().toISOString());
+
+  const now = new Date();
+  const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  document.getElementById('rate-jp-updated').textContent = 'LIVE ' + timeStr;
+  document.getElementById('rate-kr-updated').textContent = 'LIVE ' + timeStr;
+
+  if (icon) icon.style.animation = '';
+  if (!silent) showToast('✓ 匯率已更新');
 }
 
 function saveRates() {
@@ -1052,6 +1186,7 @@ function onImagePick(evt) {
     document.getElementById('cam-placeholder').style.display = 'none';
     document.getElementById('cam-zone').classList.add('filled');
     document.getElementById('analyze-btn').disabled = false;
+    document.getElementById('upload-row').style.display = 'none';  // 選好後隱藏按鈕列
   };
   reader.readAsDataURL(file);
 }
@@ -1060,11 +1195,14 @@ function resetImage(evt) {
   if (evt) evt.stopPropagation();
   currentImageB64 = null;
   document.getElementById('file-input').value = '';
+  document.getElementById('file-camera').value = '';
+  document.getElementById('file-album').value = '';
   document.getElementById('preview-img').src = '';
   document.getElementById('preview-img').style.display = 'none';
   document.getElementById('cam-placeholder').style.display = 'flex';
   document.getElementById('cam-zone').classList.remove('filled');
   document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('upload-row').style.display = 'flex';  // 重設後顯示回來
 }
 
 async function analyze() {
@@ -1081,26 +1219,47 @@ async function analyze() {
 
   document.getElementById('loading').classList.add('show');
 
-  const prompt = `你是日韓選物店的採購助理。分析這張照片（可能是商品標籤/收據/貨架/包裝）。
+  const prompt = `你是日韓選物店的專業採購助理。請仔細分析這張照片，辨識所有可見商品資訊。
 
-只輸出 JSON，格式：
+【支援辨識類型】
+- 書籍/繪本：書名、作者、出版社、ISBN、定價（含稅標示如「本体900円+税」）
+- 玩具/扭蛋/盲盒：品名、IP名稱、系列名、價格
+- 童裝/服飾：品牌、品名、尺寸、材質、價格吊牌
+- IP周邊/公仔：角色名、系列、品牌授權、價格
+- 生活雜貨/文具：品名、品牌、規格、價格
+- 收據/發票：逐一列出每個品項與金額
+- 貨架標示：辨識架上標價與商品名
+
+【價格判讀規則】
+- 日本：優先讀「本体」價（未稅），若只有含稅則用含稅價
+- 含稅標示「税込」、「（税込）」、「E」結尾均為含稅
+- 韓國：讀標示價格
+
+只輸出 JSON，格式如下，不要有任何其他文字：
 {
-  "scene": "場景描述（10字內）",
+  "scene": "場景類型（書籍標籤/商品包裝/收據/吊牌/貨架/其他，10字內）",
   "confidence": "high/medium/low",
   "items": [
     {
-      "name_original": "原文名（日/韓）",
-      "name_tw": "中文商品名（精簡）",
-      "category": "童裝|玩具|IP周邊|生活雜貨|文具|食品|其他",
+      "name_original": "原文商品名（日文或韓文，完整保留）",
+      "name_tw": "中文商品名（精簡易懂）",
+      "category": "童裝|玩具|IP周邊|生活雜貨|文具|書籍|食品|其他",
       "currency": "${currency}",
-      "price_original": 數字,
+      "price_original": 數字（未稅金額，若無則填含稅金額）,
       "price_twd": 換算台幣整數（price_original × ${rate}）,
       "price_sell": 建議售價整數（price_twd × ${markup}，進到十位）,
-      "note": "品牌/尺寸/特色（簡短）"
+      "note": "品牌／出版社／尺寸／IP名稱／系列等重要資訊（50字內）"
     }
   ]
 }
-若有多件最多列5件。無法辨識價格則price_original填0。不要輸出JSON以外的任何文字。`;
+若有多件商品最多列5件。確實無法辨識價格才將price_original填0。`;
+
+  // Bug 2 fix：自動偵測圖片格式，不寫死 jpeg
+  const imgSrc = document.getElementById('preview-img').src;
+  let mediaType = 'image/jpeg';
+  if (imgSrc.startsWith('data:image/png')) mediaType = 'image/png';
+  else if (imgSrc.startsWith('data:image/webp')) mediaType = 'image/webp';
+  else if (imgSrc.startsWith('data:image/gif')) mediaType = 'image/gif';
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1108,7 +1267,8 @@ async function analyze() {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': key,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'  // Bug 1 fix：解除 CORS 封鎖
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
@@ -1116,21 +1276,36 @@ async function analyze() {
         messages: [{
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: currentImageB64 } },
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: currentImageB64 } },
             { type: 'text', text: prompt }
           ]
         }]
       })
     });
+
+    // Bug 3 fix：正確顯示 API 錯誤（401 Key錯誤、429超量等）
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      const errMsg = errData?.error?.message || `HTTP ${res.status}`;
+      if (res.status === 401) throw new Error('API Key 無效，請到設定頁重新輸入');
+      if (res.status === 429) throw new Error('API 使用量超限，請稍後再試');
+      throw new Error(errMsg);
+    }
+
     const data = await res.json();
     const raw = (data.content?.[0]?.text || '').replace(/```json|```/g,'').trim();
-    const parsed = JSON.parse(raw);
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch(e) {
+      throw new Error('AI 回應格式異常，請重試');
+    }
     currentResults = parsed.items || [];
     selectedResultIdx = 0;
     currentQty = 1;
     openSheet(parsed);
   } catch(err) {
-    showToast('辨識失敗：' + (err.message || '請重試'));
+    showToast('❌ ' + (err.message || '辨識失敗，請重試'));
   } finally {
     document.getElementById('loading').classList.remove('show');
   }
