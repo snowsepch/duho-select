@@ -1258,9 +1258,12 @@ function onImagePick(evt) {
   const file = evt.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
-    currentImageB64 = e.target.result.split(',')[1];
-    document.getElementById('preview-img').src = e.target.result;
+  reader.onload = async e => {
+    // 透過 canvas 正規化：自動校正 EXIF 方向（修正躺平/顛倒）+ 縮放
+    const corrected = await compressImage(e.target.result, 1500, 0.85);
+    const finalSrc = corrected || e.target.result;
+    currentImageB64 = finalSrc.split(',')[1];
+    document.getElementById('preview-img').src = finalSrc;
     document.getElementById('preview-img').style.display = 'block';
     document.getElementById('cam-placeholder').style.display = 'none';
     document.getElementById('cam-zone').classList.add('filled');
@@ -1732,7 +1735,12 @@ function onManualPhotoPick(evt) {
   const file = evt.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => { manualPhotoSrc = e.target.result; renderManualPhoto(); };
+  reader.onload = async e => {
+    // 同樣透過 canvas 正規化方向
+    const corrected = await compressImage(e.target.result, 1500, 0.85);
+    manualPhotoSrc = corrected || e.target.result;
+    renderManualPhoto();
+  };
   reader.readAsDataURL(file);
 }
 function renderManualPhoto() {
