@@ -1094,6 +1094,8 @@ let manualCat = '童裝';
   renderLedger();
   // 啟動時自動抓取即時匯率
   fetchRates(true);
+  // 一次性把舊版內嵌照片搬到 IndexedDB
+  migrateOldPhotos();
 })();
 
 function switchScreen(id, btn) {
@@ -1472,8 +1474,9 @@ async function addSelected() {
     price_sell: Math.round(item.price_sell || 0),
     qty: currentQty,
     note: item.note || '',
-    photo: photo
+    hasPhoto: false
   };
+  if (photo) entry.hasPhoto = !!(await idbPut(String(entry.id), photo));
   entries.unshift(entry);
   save();
   closeSheet();
@@ -1551,8 +1554,9 @@ async function addManual() {
     price_sell: sell,
     qty: qty,
     note: document.getElementById('m-note').value.trim(),
-    photo: photo
+    hasPhoto: false
   };
+  if (photo) entry.hasPhoto = !!(await idbPut(String(entry.id), photo));
   entries.unshift(entry);
   save();
   closeManualSheet();
@@ -1615,9 +1619,12 @@ function renderLedger() {
   list.innerHTML = filtered.map((e, i) => {
     const flag = e.country === 'KR' ? 'KR' : 'JP';
     const realIdx = entries.indexOf(e);
+    const emptyThumb = `<div class="entry-thumb empty"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
     const thumb = e.photo
       ? `<div class="entry-thumb" onclick="openLightbox(this.firstElementChild.src)"><img src="${e.photo}" alt=""></div>`
-      : `<div class="entry-thumb empty"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
+      : e.hasPhoto
+        ? `<div class="entry-thumb" onclick="openLightboxById('${e.id}')"><img alt="" data-pid="${e.id}"></div>`
+        : emptyThumb;
     return `
     <div class="entry-card">
       <div class="entry-accent"></div>
@@ -1659,17 +1666,21 @@ function renderLedger() {
       </div>
     </div>`;
   }).join('');
+  hydrateThumbs();
 }
 
-function deleteEntry(idx) {
+async function deleteEntry(idx) {
+  const e = entries[idx];
+  if (e && e.hasPhoto) await idbDelete(String(e.id));
   entries.splice(idx, 1);
   save();
   renderLedger();
 }
 
-function clearAll() {
+async function clearAll() {
   if (!confirm('確定清空所有記錄？')) return;
   entries = [];
+  await idbClear();
   save();
   renderLedger();
 }
@@ -1727,6 +1738,63 @@ function compressImage(src, maxSize, quality) {
     img.onerror = () => resolve('');
     img.src = src;
   });
+}
+
+/* ═══ IndexedDB 照片儲存（容量遠大於 localStorage）═══ */
+let _idb = null;
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    if (_idb) return resolve(_idb);
+    const req = indexedDB.open('duho_select', 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains('photos'))
+        req.result.createObjectStore('photos');
+    };
+    req.onsuccess = () => { _idb = req.result; resolve(_idb); };
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbReq(mode, fn) {
+  return idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction('photos', mode);
+    const r = fn(tx.objectStore('photos'));
+    tx.oncomplete = () => resolve(r ? r.result : undefined);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  }));
+}
+function idbPut(key, val) { return idbReq('readwrite', s => s.put(val, key)).catch(() => false); }
+function idbGet(key)      { return idbReq('readonly',  s => s.get(key)).catch(() => undefined); }
+function idbDelete(key)   { return idbReq('readwrite', s => s.delete(key)).catch(() => false); }
+function idbClear()       { return idbReq('readwrite', s => s.clear()).catch(() => false); }
+
+/* 帳本縮圖從 IndexedDB 非同步補上 */
+async function hydrateThumbs() {
+  const imgs = document.querySelectorAll('#ledger-list img[data-pid]');
+  for (const img of imgs) {
+    const data = await idbGet(img.dataset.pid);
+    if (data) img.src = data;
+  }
+}
+
+/* 點縮圖 → 從 IndexedDB 取照片開燈箱 */
+async function openLightboxById(id) {
+  const data = await idbGet(String(id));
+  if (data) openLightbox(data);
+  else showToast('照片讀取失敗');
+}
+
+/* 一次性搬移：舊版內嵌 photo → IndexedDB */
+async function migrateOldPhotos() {
+  if (!entries.some(e => e.photo)) return;
+  for (const e of entries) {
+    if (e.photo) {
+      const ok = await idbPut(String(e.id), e.photo);
+      if (ok) { e.hasPhoto = true; delete e.photo; }
+    }
+  }
+  save();
+  renderLedger();
 }
 
 /* ═══ 手動新增照片 ═══ */
