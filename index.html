@@ -627,6 +627,66 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
 @media (min-width: 1025px) {
   body { max-width: 420px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 }
+
+/* ── 帳本縮圖 ── */
+.entry-thumb {
+  width: 80px; flex-shrink: 0;
+  border-right: 2px solid var(--border);
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.entry-thumb img {
+  width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in;
+}
+.entry-thumb.empty svg { width: 26px; height: 26px; color: var(--border); }
+
+/* ── 手動新增照片 ── */
+.m-photo-box {
+  width: 100%; min-height: 84px;
+  border: 2px dashed var(--border2); border-radius: 12px;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer; overflow: hidden; position: relative;
+  color: var(--muted); font-size: 13px; font-weight: 700;
+  font-family: 'Noto Sans TC', sans-serif;
+}
+.m-photo-box svg.icon { width: 20px; height: 20px; color: var(--gold); }
+.m-photo-box.filled { border-style: solid; border-color: var(--border); min-height: 0; }
+.m-photo-box.filled img { width: 100%; height: 150px; object-fit: cover; display: block; }
+.m-photo-remove {
+  position: absolute; top: 8px; right: 8px;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--cream); border: 2px solid #fff; color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+
+/* ── 圖片燈箱 ── */
+.lightbox {
+  display: none; position: fixed; inset: 0; z-index: 999;
+  background: var(--cream);
+  align-items: center; justify-content: center;
+  overflow: hidden; touch-action: none;
+}
+.lightbox.show { display: flex; }
+.lightbox img {
+  max-width: 100%; max-height: 100%;
+  transform-origin: center center; will-change: transform;
+  user-select: none; -webkit-user-drag: none;
+}
+.lb-close {
+  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 14px); right: 14px;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.35);
+  color: #fff; cursor: pointer; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+}
+.lb-hint {
+  position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+  left: 0; right: 0; text-align: center; pointer-events: none;
+  color: rgba(255,255,255,.55); font-size: 12px;
+  font-family: 'Noto Sans TC', sans-serif; letter-spacing: 1px;
+}
 </style>
 </head>
 <body>
@@ -714,11 +774,28 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
       <label>備註（選填）</label>
       <input type="text" id="m-note" placeholder="尺寸、品牌、特色">
     </div>
+    <div class="manual-field">
+      <label>商品照片（選填）</label>
+      <div class="m-photo-box" id="m-photo-box" onclick="document.getElementById('m-file').click()">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        點此加入商品照片
+      </div>
+      <input type="file" id="m-file" accept="image/*" style="display:none;" onchange="onManualPhotoPick(event)">
+    </div>
   </div>
   <div class="sheet-actions">
     <button class="sheet-cancel" onclick="closeManualSheet()">取消</button>
     <button class="sheet-add" onclick="addManual()">加入帳本</button>
   </div>
+</div>
+
+<!-- ══ LIGHTBOX ══ -->
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" onclick="closeLightbox()" aria-label="關閉">
+    <svg class="icon" viewBox="0 0 24 24" style="width:22px;height:22px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+  <img id="lb-img" src="" alt="商品照片">
+  <div class="lb-hint">雙指縮放 · 雙擊放大 · 拖曳移動</div>
 </div>
 
 <!-- ══ TOAST ══ -->
@@ -1378,9 +1455,11 @@ function changeQty(delta) {
   document.getElementById('qty-num').textContent = currentQty;
 }
 
-function addSelected() {
+async function addSelected() {
   if (!currentResults.length) { closeSheet(); return; }
   const item = currentResults[selectedResultIdx] || currentResults[0];
+  const photoSrc = document.getElementById('preview-img').src;
+  const photo = photoSrc.startsWith('data:') ? await compressImage(photoSrc, 760, 0.62) : '';
   const entry = {
     id: Date.now() + Math.random(),
     date: new Date().toLocaleDateString('zh-TW'),
@@ -1393,7 +1472,8 @@ function addSelected() {
     price_twd: Math.round(item.price_twd || 0),
     price_sell: Math.round(item.price_sell || 0),
     qty: currentQty,
-    note: item.note || ''
+    note: item.note || '',
+    photo: photo
   };
   entries.unshift(entry);
   save();
@@ -1409,6 +1489,9 @@ function openManualSheet() {
   document.getElementById('m-price-orig').value = '';
   document.getElementById('m-qty').value = '1';
   document.getElementById('m-note').value = '';
+  manualPhotoSrc = '';
+  document.getElementById('m-file').value = '';
+  renderManualPhoto();
   document.querySelectorAll('#m-cat-grid .cat-pill').forEach((el, i) =>
     el.classList.toggle('selected', i === 0));
   manualCat = '童裝';
@@ -1442,7 +1525,7 @@ function updateManualPreview() {
   document.getElementById('m-sell').textContent = `NT$ ${(sell * qty).toLocaleString()}`;
 }
 
-function addManual() {
+async function addManual() {
   const nameTw = document.getElementById('m-name-tw').value.trim();
   const priceOrig = parseFloat(document.getElementById('m-price-orig').value) || 0;
   if (!nameTw) { showToast('請輸入商品名'); return; }
@@ -1454,6 +1537,7 @@ function addManual() {
   const markup = getMarkup();
   const twd = Math.round(priceOrig * rate);
   const sell = Math.round(twd * markup / 10) * 10;
+  const photo = manualPhotoSrc ? await compressImage(manualPhotoSrc, 760, 0.62) : '';
 
   const entry = {
     id: Date.now() + Math.random(),
@@ -1467,7 +1551,8 @@ function addManual() {
     price_twd: twd,
     price_sell: sell,
     qty: qty,
-    note: document.getElementById('m-note').value.trim()
+    note: document.getElementById('m-note').value.trim(),
+    photo: photo
   };
   entries.unshift(entry);
   save();
@@ -1531,9 +1616,13 @@ function renderLedger() {
   list.innerHTML = filtered.map((e, i) => {
     const flag = e.country === 'KR' ? 'KR' : 'JP';
     const realIdx = entries.indexOf(e);
+    const thumb = e.photo
+      ? `<div class="entry-thumb" onclick="openLightbox(this.firstElementChild.src)"><img src="${e.photo}" alt=""></div>`
+      : `<div class="entry-thumb empty"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
     return `
     <div class="entry-card">
       <div class="entry-accent"></div>
+      ${thumb}
       <div class="entry-body">
         <div class="entry-top">
           <div>
@@ -1608,7 +1697,11 @@ function exportCSV() {
 }
 
 function save() {
-  try { localStorage.setItem('tl_entries', JSON.stringify(entries)); } catch(e){}
+  try {
+    localStorage.setItem('tl_entries', JSON.stringify(entries));
+  } catch(e) {
+    showToast('⚠️ 儲存空間已滿，照片可能未存檔');
+  }
 }
 
 function showToast(msg) {
@@ -1617,6 +1710,141 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
 }
+
+/* ═══ 圖片壓縮（存進 localStorage 前縮小）═══ */
+function compressImage(src, maxSize, quality) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > h && w > maxSize) { h = Math.round(h * maxSize / w); w = maxSize; }
+      else if (h >= w && h > maxSize) { w = Math.round(w * maxSize / h); h = maxSize; }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      try { resolve(c.toDataURL('image/jpeg', quality)); }
+      catch(e) { resolve(''); }
+    };
+    img.onerror = () => resolve('');
+    img.src = src;
+  });
+}
+
+/* ═══ 手動新增照片 ═══ */
+let manualPhotoSrc = '';
+function onManualPhotoPick(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { manualPhotoSrc = e.target.result; renderManualPhoto(); };
+  reader.readAsDataURL(file);
+}
+function renderManualPhoto() {
+  const box = document.getElementById('m-photo-box');
+  if (!box) return;
+  if (manualPhotoSrc) {
+    box.classList.add('filled');
+    box.innerHTML = `<img src="${manualPhotoSrc}" alt="">`
+      + `<button class="m-photo-remove" onclick="removeManualPhoto(event)" aria-label="移除">`
+      + `<svg class="icon" viewBox="0 0 24 24" style="width:16px;height:16px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+  } else {
+    box.classList.remove('filled');
+    box.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>點此加入商品照片`;
+  }
+}
+function removeManualPhoto(evt) {
+  if (evt) evt.stopPropagation();
+  manualPhotoSrc = '';
+  document.getElementById('m-file').value = '';
+  renderManualPhoto();
+}
+
+/* ═══ 圖片燈箱（雙指縮放／拖曳）═══ */
+let lbScale = 1, lbTX = 0, lbTY = 0;
+let lbPinchDist = 0, lbPinchScale = 1;
+let lbDrag = false, lbDragX = 0, lbDragY = 0, lbDragTX = 0, lbDragTY = 0;
+
+function openLightbox(src) {
+  if (!src || !src.startsWith('data:')) return;
+  document.getElementById('lb-img').src = src;
+  lbScale = 1; lbTX = 0; lbTY = 0; lbApply();
+  document.getElementById('lightbox').classList.add('show');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('show');
+  document.getElementById('lb-img').src = '';
+}
+function lbApply() {
+  document.getElementById('lb-img').style.transform =
+    `translate(${lbTX}px,${lbTY}px) scale(${lbScale})`;
+}
+function lbClamp() {
+  lbScale = Math.min(5, Math.max(1, lbScale));
+  if (lbScale <= 1.001) { lbScale = 1; lbTX = 0; lbTY = 0; }
+}
+function lbDist(t) {
+  return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+}
+function lbTouchStart(e) {
+  if (e.touches.length === 2) {
+    lbPinchDist = lbDist(e.touches);
+    lbPinchScale = lbScale;
+  } else if (e.touches.length === 1) {
+    lbDrag = true;
+    lbDragX = e.touches[0].clientX; lbDragY = e.touches[0].clientY;
+    lbDragTX = lbTX; lbDragTY = lbTY;
+  }
+}
+function lbTouchMove(e) {
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    lbScale = lbPinchScale * (lbDist(e.touches) / (lbPinchDist || 1));
+    lbClamp(); lbApply();
+  } else if (e.touches.length === 1 && lbScale > 1 && lbDrag) {
+    e.preventDefault();
+    lbTX = lbDragTX + (e.touches[0].clientX - lbDragX);
+    lbTY = lbDragTY + (e.touches[0].clientY - lbDragY);
+    lbApply();
+  }
+}
+function lbTouchEnd(e) {
+  if (e.touches.length === 0) lbDrag = false;
+}
+function lbWheel(e) {
+  e.preventDefault();
+  lbScale += (e.deltaY < 0 ? 0.3 : -0.3);
+  lbClamp(); lbApply();
+}
+function lbDblClick() {
+  lbScale = lbScale > 1 ? 1 : 2.5;
+  lbClamp(); lbApply();
+}
+function lbMouseDown(e) {
+  if (lbScale <= 1) return;
+  lbDrag = true;
+  lbDragX = e.clientX; lbDragY = e.clientY;
+  lbDragTX = lbTX; lbDragTY = lbTY;
+}
+function lbMouseMove(e) {
+  if (!lbDrag || lbScale <= 1) return;
+  lbTX = lbDragTX + (e.clientX - lbDragX);
+  lbTY = lbDragTY + (e.clientY - lbDragY);
+  lbApply();
+}
+function lbMouseUp() { lbDrag = false; }
+
+(function lbInit() {
+  const lb = document.getElementById('lightbox');
+  if (!lb) return;
+  lb.addEventListener('touchstart', lbTouchStart, { passive: false });
+  lb.addEventListener('touchmove', lbTouchMove, { passive: false });
+  lb.addEventListener('touchend', lbTouchEnd);
+  lb.addEventListener('wheel', lbWheel, { passive: false });
+  lb.addEventListener('dblclick', lbDblClick);
+  lb.addEventListener('mousedown', lbMouseDown);
+  window.addEventListener('mousemove', lbMouseMove);
+  window.addEventListener('mouseup', lbMouseUp);
+})();
 </script>
 </body>
 </html>
