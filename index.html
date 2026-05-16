@@ -618,14 +618,10 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
   .scroll-body { padding: 14px 14px 0; }
 }
 
-/* ── 平板 ── */
-@media (min-width: 781px) and (max-width: 1024px) {
-  body { max-width: 480px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
-}
-
-/* ── 桌面預覽 ── */
-@media (min-width: 1025px) {
-  body { max-width: 420px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+/* ── 平板／桌面：寬度大於手機時置中為手機寬度欄，三種裝置比例一致 ── */
+@media (min-width: 481px) {
+  body { max-width: 440px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+  .sheet { width: 440px; left: 50%; right: auto; margin-left: -220px; }
 }
 
 /* ── 帳本縮圖 ── */
@@ -1047,7 +1043,7 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
 
     <!-- 版本標記 -->
     <div style="text-align:center; padding:6px 0 24px; color:var(--muted); font-family:'Bebas Neue',sans-serif; font-size:12px; letter-spacing:2.5px;">
-      DUHO SELECT &nbsp;·&nbsp; V1.1 &nbsp;·&nbsp; 2026.05
+      DUHO SELECT &nbsp;·&nbsp; V1.2 &nbsp;·&nbsp; 2026.05
     </div>
   </div>
 
