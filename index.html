@@ -535,6 +535,14 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
   cursor:pointer; transition: all .2s;
 }
 .exp-btn:active { background: var(--mint-lt); }
+.export-xlsx-btn {
+  width: 100%; padding: 14px; border-radius: 10px;
+  background: var(--mint); border: none; color: var(--surface);
+  font-family:'Noto Sans TC',sans-serif; font-size: 14px; font-weight: 900; letter-spacing: 1px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer; transition: opacity .15s;
+}
+.export-xlsx-btn:active { opacity: .85; }
 
 /* ══════════════════════════════════
    SCREEN 3 · SETTINGS
@@ -1040,13 +1048,24 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
     </div>
 
     <div class="settings-section">
+      <div class="settings-label">資料匯出</div>
+      <button class="export-xlsx-btn" onclick="exportExcel()">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        匯出 Excel（.xlsx）
+      </button>
+      <div class="settings-row-sub" style="padding:8px 4px 0; line-height:1.6;">
+        匯出帳本所有記錄為 Excel 檔，金額為可計算的數字格式，首列已凍結。
+      </div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-label">資料管理</div>
       <button class="danger-btn" onclick="clearAll()">清空所有帳本記錄</button>
     </div>
 
     <!-- 版本標記 -->
     <div style="text-align:center; padding:6px 0 24px; color:var(--muted); font-family:'Bebas Neue',sans-serif; font-size:12px; letter-spacing:2.5px;">
-      DUHO SELECT &nbsp;·&nbsp; V1.6 &nbsp;·&nbsp; 2026.05
+      DUHO SELECT &nbsp;·&nbsp; V1.7 &nbsp;·&nbsp; 2026.05
     </div>
   </div>
 
@@ -1700,6 +1719,122 @@ function exportCSV() {
   a.download = `Duho選品帳本_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   showToast('CSV 已匯出');
+}
+
+/* ── Excel (.xlsx) 匯出：純前端產生真實 xlsx，無外部套件 ── */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = -1;
+  for (let i = 0; i < bytes.length; i++) c = (c >>> 8) ^ CRC_TABLE[(c ^ bytes[i]) & 0xff];
+  return (c ^ -1) >>> 0;
+}
+/* store-only（不壓縮）ZIP 打包 */
+function zipStore(files) {
+  const enc = new TextEncoder();
+  const u16 = n => [n & 0xff, (n >>> 8) & 0xff];
+  const u32 = n => { n = n >>> 0; return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff]; };
+  const parts = [], central = [];
+  let offset = 0;
+  for (const [name, content] of files) {
+    const nameB = enc.encode(name);
+    const data = enc.encode(content);
+    const crc = crc32(data), size = data.length;
+    const header = [
+      0x50,0x4b,0x03,0x04, ...u16(20), ...u16(0), ...u16(0),
+      ...u16(0), ...u16(0), ...u32(crc), ...u32(size), ...u32(size),
+      ...u16(nameB.length), ...u16(0), ...nameB
+    ];
+    parts.push(new Uint8Array(header), data);
+    central.push(new Uint8Array([
+      0x50,0x4b,0x01,0x02, ...u16(20), ...u16(20), ...u16(0), ...u16(0),
+      ...u16(0), ...u16(0), ...u32(crc), ...u32(size), ...u32(size),
+      ...u16(nameB.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(0), ...u32(offset), ...nameB
+    ]));
+    offset += header.length + data.length;
+  }
+  let cdSize = 0;
+  central.forEach(c => cdSize += c.length);
+  const eocd = new Uint8Array([
+    0x50,0x4b,0x05,0x06, ...u16(0), ...u16(0),
+    ...u16(files.length), ...u16(files.length),
+    ...u32(cdSize), ...u32(offset), ...u16(0)
+  ]);
+  const all = [...parts, ...central, eocd];
+  let total = 0;
+  all.forEach(a => total += a.length);
+  const out = new Uint8Array(total);
+  let p = 0;
+  for (const a of all) { out.set(a, p); p += a.length; }
+  return out;
+}
+function colName(n) {
+  let s = ''; n++;
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; }
+  return s;
+}
+function xmlEsc(v) {
+  return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+/* 把二維陣列組成 xlsx；numCols=該索引欄輸出為數字格式 */
+function buildXlsx(aoa, numCols, sheetName) {
+  let rowsXml = '';
+  aoa.forEach((row, r) => {
+    let cells = '';
+    row.forEach((val, c) => {
+      const ref = colName(c) + (r + 1);
+      const isNum = r > 0 && numCols.has(c) && val !== '' && val !== null && val !== undefined && isFinite(val);
+      if (isNum) cells += `<c r="${ref}"><v>${Number(val)}</v></c>`;
+      else cells += `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(val)}</t></is></c>`;
+    });
+    rowsXml += `<row r="${r + 1}">${cells}</row>`;
+  });
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="12" width="13" customWidth="1"/><col min="13" max="13" width="26" customWidth="1"/></cols><sheetData>${rowsXml}</sheetData></worksheet>`;
+  const files = [
+    ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`],
+    ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xmlEsc(sheetName)}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+    ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`],
+    ['xl/worksheets/sheet1.xml', sheet],
+  ];
+  return zipStore(files);
+}
+function exportExcel() {
+  if (!entries.length) { showToast('帳本是空的'); return; }
+  const headers = ['日期','國家','中文名','原文名','品類','原幣','原始價','進貨台幣','建議售價','數量','小計成本','小計售價','備註'];
+  const numCols = new Set([6, 7, 8, 9, 10, 11]);
+  const aoa = [headers];
+  entries.forEach(e => {
+    const qty = e.qty || 1;
+    aoa.push([
+      e.date, e.country === 'KR' ? '韓國' : '日本',
+      e.name_tw, e.name_original, e.category,
+      e.currency, e.price_original,
+      e.price_twd, e.price_sell, qty,
+      (e.price_twd || 0) * qty,
+      (e.price_sell || 0) * qty,
+      e.note
+    ]);
+  });
+  const xlsx = buildXlsx(aoa, numCols, 'Duho選品帳本');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([xlsx], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  a.download = `Duho選品帳本_${new Date().toISOString().slice(0,10)}.xlsx`;
+  a.click();
+  showToast('Excel 已匯出');
 }
 
 function save() {
