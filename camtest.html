@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拍照測試頁</title>
+<style>
+  body { font-family: -apple-system, "Noto Sans TC", sans-serif; margin:0; padding:20px;
+         background:#f5f5f0; color:#222; line-height:1.5; }
+  h1 { font-size:21px; margin:0 0 4px; }
+  .stamp { font-size:12px; color:#999; margin-bottom:14px; }
+  .note { font-size:13px; color:#555; background:#fff; border:1px solid #ddd;
+          border-radius:10px; padding:12px; }
+  .test { background:#fff; border:2px solid #ccc; border-radius:12px; padding:16px; margin:14px 0; }
+  .test h2 { font-size:15px; margin:0 0 10px; }
+  .btn { display:block; width:100%; box-sizing:border-box; padding:18px; font-size:17px;
+         font-weight:700; background:#C4341A; color:#fff; border:none; border-radius:10px;
+         text-align:center; cursor:pointer; -webkit-tap-highlight-color:rgba(0,0,0,.1); }
+  .sr { position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; clip:rect(0 0 0 0); }
+  .vis { font-size:16px; }
+  .result { margin-top:12px; font-size:14px; font-weight:700; color:#3D9580; }
+  .result.empty { color:#aaa; font-weight:400; }
+  #err { background:#fff3f0; border:2px solid #C4341A; color:#C4341A; border-radius:10px;
+         padding:12px; font-size:13px; margin:14px 0; display:none; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<h1>📷 拍照測試頁</h1>
+<div class="stamp" id="stamp"></div>
+<div class="note">這是全新測試頁（手機沒開過＝無快取干擾）。請<b>逐一</b>點下面 3 個按鈕，看哪些會打開相機/相簿、選完後有沒有出現綠色「✓ 成功」訊息，再把結果告訴我。</div>
+
+<div id="err"></div>
+
+<div class="test">
+  <h2>測試 1：label 方式（新修法）</h2>
+  <label class="btn" for="t1">點我 → 拍照</label>
+  <input class="sr" type="file" id="t1" accept="image/*" capture="environment">
+  <div class="result empty" id="r1">（還沒測）</div>
+</div>
+
+<div class="test">
+  <h2>測試 2：最原始的可見檔案選取鈕</h2>
+  <input class="vis" type="file" id="t2" accept="image/*">
+  <div class="result empty" id="r2">（還沒測）</div>
+</div>
+
+<div class="test">
+  <h2>測試 3：舊的程式觸發方式（對照組）</h2>
+  <button class="btn" onclick="document.getElementById('t3').click()">點我 → 拍照</button>
+  <input class="sr" type="file" id="t3" accept="image/*" capture="environment">
+  <div class="result empty" id="r3">（還沒測）</div>
+</div>
+
+<script>
+  window.onerror = function(msg, src, line) {
+    var e = document.getElementById('err');
+    e.style.display = 'block';
+    e.textContent = '⚠️ 偵測到 JavaScript 錯誤：\n' + msg + '\n（行 ' + line + '）';
+  };
+  document.getElementById('stamp').textContent =
+    '頁面載入時間：' + new Date().toLocaleString('zh-TW');
+  function report(n) {
+    var input = document.getElementById('t' + n);
+    var r = document.getElementById('r' + n);
+    var f = input.files[0];
+    r.className = 'result';
+    r.textContent = f
+      ? '✓ 成功！檔名：' + f.name + '　大小：' + Math.round(f.size / 1024) + ' KB'
+      : '（選取畫面有開，但沒拿到檔案）';
+  }
+  document.getElementById('t1').addEventListener('change', function () { report(1); });
+  document.getElementById('t2').addEventListener('change', function () { report(2); });
+  document.getElementById('t3').addEventListener('change', function () { report(3); });
+</script>
+</body>
+</html>
