@@ -829,7 +829,7 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
             JPY → TWD
             <span id="rate-jp-updated" style="font-size:10px;color:var(--mint);font-family:'Noto Sans TC',sans-serif;font-weight:700;"></span>
           </div>
-          <input type="number" id="rate-jpy" class="rate-val" value="0.215" step="0.001" min="0.01" onchange="saveRates()">
+          <input type="number" id="rate-jpy" class="rate-val" value="0.199" step="0.001" min="0.01" onchange="saveRates()">
         </div>
         <button onclick="fetchRates()" id="rate-refresh-btn" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--mint);flex-shrink:0;" title="更新匯率">
           <svg class="icon" id="rate-refresh-icon" viewBox="0 0 24 24" style="width:20px;height:20px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -841,7 +841,7 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
             KRW → TWD
             <span id="rate-kr-updated" style="font-size:10px;color:var(--mint);font-family:'Noto Sans TC',sans-serif;font-weight:700;"></span>
           </div>
-          <input type="number" id="rate-krw" class="rate-val" value="0.023" step="0.001" min="0.001" onchange="saveRates()">
+          <input type="number" id="rate-krw" class="rate-val" value="0.0211" step="0.0001" min="0.001" onchange="saveRates()">
         </div>
         <button onclick="fetchRates()" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--mint);flex-shrink:0;" title="更新匯率">
           <svg class="icon" viewBox="0 0 24 24" style="width:20px;height:20px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -1010,7 +1010,7 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
         <span class="country-badge">JP</span>
         <div class="settings-info">
           <div class="settings-row-label">日圓 JPY → TWD</div>
-          <div class="settings-row-sub">例：1 JPY = 0.215 TWD</div>
+          <div class="settings-row-sub">例：1 JPY ≈ 0.199 TWD（開啟時自動更新）</div>
         </div>
         <input type="number" class="settings-input" id="s-rate-jpy" step="0.001" min="0.01" onchange="syncRates()">
       </div>
@@ -1018,9 +1018,9 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
         <span class="country-badge">KR</span>
         <div class="settings-info">
           <div class="settings-row-label">韓元 KRW → TWD</div>
-          <div class="settings-row-sub">例：1 KRW = 0.023 TWD</div>
+          <div class="settings-row-sub">例：1 KRW ≈ 0.0211 TWD（開啟時自動更新）</div>
         </div>
-        <input type="number" class="settings-input" id="s-rate-krw" step="0.001" min="0.001" onchange="syncRates()">
+        <input type="number" class="settings-input" id="s-rate-krw" step="0.0001" min="0.001" onchange="syncRates()">
       </div>
     </div>
 
@@ -1043,7 +1043,7 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
 
     <!-- 版本標記 -->
     <div style="text-align:center; padding:6px 0 24px; color:var(--muted); font-family:'Bebas Neue',sans-serif; font-size:12px; letter-spacing:2.5px;">
-      DUHO SELECT &nbsp;·&nbsp; V1.2 &nbsp;·&nbsp; 2026.05
+      DUHO SELECT &nbsp;·&nbsp; V1.3 &nbsp;·&nbsp; 2026.05
     </div>
   </div>
 
@@ -1075,8 +1075,8 @@ let manualCat = '童裝';
       document.getElementById('api-status').textContent = '✓ Key 已載入';
       document.getElementById('api-status').className = 'api-status ok';
     }
-    const jpy = localStorage.getItem('tl_jpy') || '0.215';
-    const krw = localStorage.getItem('tl_krw') || '0.023';
+    const jpy = localStorage.getItem('tl_jpy') || '0.199';
+    const krw = localStorage.getItem('tl_krw') || '0.0211';
     const mu  = localStorage.getItem('tl_markup') || '2.5';
     document.getElementById('rate-jpy').value = jpy;
     document.getElementById('rate-krw').value = krw;
@@ -1084,12 +1084,9 @@ let manualCat = '童裝';
     document.getElementById('s-rate-krw').value = krw;
     document.getElementById('markup').value = mu;
 
-    // 顯示上次更新時間
-    const lastFetch = localStorage.getItem('tl_rate_fetched');
-    if (lastFetch) {
-      document.getElementById('rate-jp-updated').textContent = 'LIVE';
-      document.getElementById('rate-kr-updated').textContent = 'LIVE';
-    }
+    // 啟動後緊接著 fetchRates()，先標「更新中」，成功/失敗由 fetchRates 覆寫
+    document.getElementById('rate-jp-updated').textContent = '更新中…';
+    document.getElementById('rate-kr-updated').textContent = '更新中…';
   } catch(e) {}
   renderLedger();
   // 啟動時自動抓取即時匯率
@@ -1129,27 +1126,26 @@ async function fetchRates(silent = false) {
   const icon = document.getElementById('rate-refresh-icon');
   if (icon) icon.style.animation = 'spin .8s linear infinite';
 
-  // 依序嘗試三個支援 CORS 的免費 API
+  // 合理區間：API 改格式／回錯幣別／算出 Infinity 時據此剔除，避免換出離譜金額
+  const SANE = { jpy: [0.15, 0.30], krw: [0.015, 0.035] };
+  const sane = (v, b) => Number.isFinite(v) && v >= b[0] && v <= b[1];
+
+  // 兩個實測可用、支援 CORS 的免費 API（主 → 備援）
   const APIs = [
     {
-      // Frankfurter：歐洲央行資料，穩定支援 CORS
-      url: 'https://api.frankfurter.app/latest?from=JPY&to=TWD',
-      parse: (d) => ({ jpy: d.rates['TWD'], krw: null })
-    },
-    {
-      // open.er-api.com：免費、無需 Key、明確支援 CORS
+      // open.er-api.com：免費、無需 Key、含台幣 TWD
       url: 'https://open.er-api.com/v6/latest/TWD',
       parse: (d) => ({
-        jpy: d.rates ? (1 / d.rates['JPY']) : null,
-        krw: d.rates ? (1 / d.rates['KRW']) : null
+        jpy: (d && d.rates && d.rates['JPY']) ? 1 / d.rates['JPY'] : NaN,
+        krw: (d && d.rates && d.rates['KRW']) ? 1 / d.rates['KRW'] : NaN
       })
     },
     {
-      // fawazahmed0 CDN：完全免費無限制
+      // fawazahmed0 CDN：完全免費備援
       url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/twd.json',
       parse: (d) => ({
-        jpy: d.twd ? (1 / d.twd['jpy']) : null,
-        krw: d.twd ? (1 / d.twd['krw']) : null
+        jpy: (d && d.twd && d.twd['jpy']) ? 1 / d.twd['jpy'] : NaN,
+        krw: (d && d.twd && d.twd['krw']) ? 1 / d.twd['krw'] : NaN
       })
     }
   ];
@@ -1160,52 +1156,49 @@ async function fetchRates(silent = false) {
     try {
       const res = await fetch(api.url, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) continue;
-      const data = await res.json();
-      const parsed = api.parse(data);
-      if (parsed.jpy && parsed.jpy > 0) jpyRate = parsed.jpy;
-      if (parsed.krw && parsed.krw > 0) krwRate = parsed.krw;
-      if (jpyRate) break; // 拿到 JPY 就夠用了
+      const p = api.parse(await res.json());
+      if (!jpyRate && sane(p.jpy, SANE.jpy)) jpyRate = p.jpy;   // 只接受合理範圍內的值
+      if (!krwRate && sane(p.krw, SANE.krw)) krwRate = p.krw;
+      if (jpyRate && krwRate) break;
     } catch(e) { continue; }
   }
 
-  // JPY 拿到了但 KRW 還沒有，再補抓一次
-  if (jpyRate && !krwRate) {
-    try {
-      const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/krw.json', { signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.krw && data.krw['twd']) krwRate = data.krw['twd'];
-      }
-    } catch(e) {}
-  }
-
-  if (!jpyRate) {
-    if (!silent) showToast('❌ 匯率抓取失敗，請手動輸入');
-    if (icon) icon.style.animation = '';
-    return;
-  }
-
-  const jpyFinal = jpyRate.toFixed(4);
-  const krwFinal = krwRate ? krwRate.toFixed(5) : null;
-
-  document.getElementById('rate-jpy').value = jpyFinal;
-  document.getElementById('s-rate-jpy').value = jpyFinal;
-  localStorage.setItem('tl_jpy', jpyFinal);
-
-  if (krwFinal) {
-    document.getElementById('rate-krw').value = krwFinal;
-    document.getElementById('s-rate-krw').value = krwFinal;
-    localStorage.setItem('tl_krw', krwFinal);
-  }
-
-  localStorage.setItem('tl_rate_fetched', new Date().toISOString());
+  if (icon) icon.style.animation = '';
 
   const now = new Date();
   const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-  document.getElementById('rate-jp-updated').textContent = 'LIVE ' + timeStr;
-  document.getElementById('rate-kr-updated').textContent = 'LIVE ' + timeStr;
+  const jpBadge = document.getElementById('rate-jp-updated');
+  const krBadge = document.getElementById('rate-kr-updated');
 
-  if (icon) icon.style.animation = '';
+  // 兩個幣別都沒抓到合理值 → 不覆蓋現有匯率，明確標示離線
+  if (!jpyRate && !krwRate) {
+    jpBadge.textContent = '離線・非即時';
+    krBadge.textContent = '離線・非即時';
+    if (!silent) showToast('❌ 匯率異常或抓取失敗，沿用現值');
+    return;
+  }
+
+  if (jpyRate) {
+    const v = jpyRate.toFixed(4);
+    document.getElementById('rate-jpy').value = v;
+    document.getElementById('s-rate-jpy').value = v;
+    localStorage.setItem('tl_jpy', v);
+    jpBadge.textContent = 'LIVE ' + timeStr;
+  } else {
+    jpBadge.textContent = '離線・非即時';
+  }
+
+  if (krwRate) {
+    const v = krwRate.toFixed(5);
+    document.getElementById('rate-krw').value = v;
+    document.getElementById('s-rate-krw').value = v;
+    localStorage.setItem('tl_krw', v);
+    krBadge.textContent = 'LIVE ' + timeStr;
+  } else {
+    krBadge.textContent = '離線・非即時';
+  }
+
+  localStorage.setItem('tl_rate_fetched', new Date().toISOString());
   if (!silent) showToast('✓ 匯率已更新');
 }
 
@@ -1233,8 +1226,8 @@ function getMarkup() {
   return parseFloat(document.getElementById('markup').value) || 2.5;
 }
 function getRate(currency) {
-  if (currency === 'KRW') return parseFloat(document.getElementById('rate-krw').value) || 0.023;
-  return parseFloat(document.getElementById('rate-jpy').value) || 0.215;
+  if (currency === 'KRW') return parseFloat(document.getElementById('rate-krw').value) || 0.0211;
+  return parseFloat(document.getElementById('rate-jpy').value) || 0.199;
 }
 
 function saveApiKey() {
