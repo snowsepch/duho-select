@@ -184,7 +184,8 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
   display: none;
 }
 .cam-placeholder {
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  width: 100%; height: 100%; cursor: pointer;
 }
 .cam-placeholder .big-icon {
   width: 64px; height: 64px; border-radius: 50%;
@@ -855,13 +856,13 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
     <div class="cam-zone" id="cam-zone">
       <img id="preview-img" src="" alt="">
       <button class="reselect-btn" onclick="resetImage(event)" title="重選">✕</button>
-      <div class="cam-placeholder" id="cam-placeholder">
+      <label class="cam-placeholder" id="cam-placeholder" for="file-input">
         <div class="big-icon">
           <svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </div>
         <p>拍攝商品標籤<br>或 上傳收據照片</p>
         <span>支援日韓文字辨識</span>
-      </div>
+      </label>
     </div>
 
     <!-- 拍照 / 相簿 兩個入口 -->
@@ -1045,7 +1046,7 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
 
     <!-- 版本標記 -->
     <div style="text-align:center; padding:6px 0 24px; color:var(--muted); font-family:'Bebas Neue',sans-serif; font-size:12px; letter-spacing:2.5px;">
-      DUHO SELECT &nbsp;·&nbsp; V1.4 &nbsp;·&nbsp; 2026.05
+      DUHO SELECT &nbsp;·&nbsp; V1.5 &nbsp;·&nbsp; 2026.05
     </div>
   </div>
 
