@@ -1059,6 +1059,17 @@ svg.icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-w
     </div>
 
     <div class="settings-section">
+      <div class="settings-label">分享應用</div>
+      <button class="export-xlsx-btn" style="background:var(--gold);" onclick="shareApp()">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        分享給朋友
+      </button>
+      <div class="settings-row-sub" style="padding:8px 4px 0; line-height:1.6;">
+        把 Duho Select 推薦給朋友。可透過 AirDrop、訊息、LINE 等方式分享連結，對方再加到主畫面就能用。
+      </div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-label">資料管理</div>
       <button class="danger-btn" onclick="clearAll()">清空所有帳本記錄</button>
     </div>
@@ -1850,6 +1861,25 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+async function shareApp() {
+  const shareData = {
+    title: 'Duho Select 嘟賀選物',
+    text: '旅購記帳工具 — 拍照辨識日韓商品，自動換算 TWD',
+    url: 'https://snowsepch.github.io/duho-select/'
+  };
+  if (navigator.share) {
+    try { await navigator.share(shareData); }
+    catch (err) { if (err.name !== 'AbortError') showToast('❌ 分享失敗'); }
+  } else if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(shareData.url);
+      showToast('✓ 連結已複製');
+    } catch { showToast('❌ 無法複製連結'); }
+  } else {
+    showToast('此瀏覽器不支援分享');
+  }
 }
 
 /* ═══ 圖片壓縮（存進 localStorage 前縮小）═══ */
